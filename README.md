@@ -23,7 +23,7 @@ Mirage has two modes, a training mode and an estimation mode. In the training mo
         -o STR    OutputFileName
         
     (Optional) 
-        -l INT    The number of maximum gene copy numbers [default:3]
+        -l INT    The maximum gene copy numbers [default:3]
         -m INT    Specification of the evolutionary model. 0: the RER model 1: the two-parameter model 2: the K&M model 3: the BDI model [default: 0]
         -k INT    The number of mixture components in the phylogenetic mixture model [default: 5]
         
@@ -41,7 +41,7 @@ In the training mode, Mirage output four files whose extensions are "bas", "par"
 
 "bas" file describes basic information about the execution, e.g. runtimes option and likelihood. "res" files describes responsibilities, which are the probabilities that each ortholog belongs to each gene-content cluster. "ahr" files describes estimated gene content history. The gene contets are outputted in preorder traversal (current-left-right) of the input phylogenetic tree.
 
-"par" file describes estimated evolutionary model parameters. The first line describes parameter $\phi$, mixing probabilites of gene-content clusters. From the next line, pi_1, R_1, pi_2, R_2, ..., pi_k, R_k are described. In the R_i, [R_i]01, 
+"par" file describes estimated evolutionary model parameters. The first line describes parameter $\phi$, mixing probabilites of gene-content clusters. From the next line, pi_1, R_1, pi_2, R_2, ..., pi_k, R_k are described. In the R_i, the parameters are listed in the order [R_i]01, [R_i]12, ..., [R_i](l-1)l, [R_i]10, [R_i]21, ..., [R_i]l(l-1). Here, l is the maximum gene copy numbers.
 
 ## External libraries
 This repository includes the code of an external libraries, "Eigen".  
