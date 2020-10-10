@@ -33,11 +33,13 @@ Mirage has two modes, a training mode and an estimation mode. In the training mo
                 
 ## Input File Format
 The input file must be in the following format.  
-In the first line, the number of ortholog is described.  
-In the second line, the phylogenetic tree is described in the newick format.  
-In the third line, the taxon name in the phylogenetic tree is listed.  
-In the following lines, the ortsholog table is described.  
+In the first, second and third lines, the number of ortholog, the phylogenetic tree in the newick format and the taxon name in the phylogenetic tree is described, respectively. In the following lines, the ortsholog table is described.
 We have uploaded three files, archaea_data.txt, micrococcales_data.txt, and fungi_data.txt, as the input file examples, please see them.
+
+## Output File Format
+In the training mode, Mirage output four files whose extensions are "bas", "par", "res" and "ahr". In the estimation mode, Mirage output three files, "bas", "res" and "ahr" file. If users specify "output1" in command line option "-o", the output file is "output1.bas", "output1.par", "output1.res" and "output1.ahr". 
+
+"bas" file describes basic information about the execution, e.g. runtimes option and likelihood. "res" files describes responsibilities, which are the probabilities that each ortholog belongs to each gene-content cluster. "ahr" files describes estimated gene content history. The gene contets are outputted in preorder traversal (current-left-right) of the input phylogenetic tree.
 
 ## External libraries
 This repository includes the code of an external libraries, "Eigen".  
