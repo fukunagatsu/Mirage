@@ -31,6 +31,14 @@ Mirage has two modes, a training mode and an estimation mode. In the training mo
     
     Mirage train [-i InputFileName] [-o OutputFileName] [-p ParameterFileName]
                 
+## Input File Format
+The input file must be in the following format.  
+In the first line, the number of ortholog is described.  
+In the second line, the phylogenetic tree is described in the newick format.  
+In the third line, the taxon name in the phylogenetic tree is listed.  
+In the following lines, the ortsholog table is described.  
+We have uploaded three files, archaea_data.txt, micrococcales_data.txt, and fungi_data.txt, as the input file examples, please see them.
+
 ## External libraries
 This repository includes the code of an external libraries, "Eigen".  
 [Eigen](http://eigen.tuxfamily.org/index.php) is a C++ library for linear algebra.
