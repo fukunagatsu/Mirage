@@ -29,6 +29,8 @@ typedef struct lparameter {
   vector<double> beta;
   vector<double> gamma;
   vector<vector<double> > parameter;
+  double gamma_distribution_parameter;
+  vector<double> rate_parameter;
 } Parameter;
 
 #endif

@@ -15,7 +15,7 @@ Mirage has two modes, a training mode and an estimation mode. In the training mo
     train: train evolutionary model parameters and estimate ancestral genome
 
     Mirage train [-i InputFileName] [-o OutputFileName] [-l MaximumGeneCopyNumbers]  
-                [-m ModelId] [-k NumberOfMixtures] 
+                [-m Gain/LossModelId] [-k NumberOfMixtures] [-n HeterogeneityModelId]
    
     Options:
     (Required)
@@ -24,8 +24,9 @@ Mirage has two modes, a training mode and an estimation mode. In the training mo
         
     (Optional) 
         -l INT    The maximum gene copy numbers [default:3]
-        -m INT    Specification of the evolutionary model. 0: the RER model 1: the two-parameter model 2: the K&M model 3: the BDI model [default: 0]
+        -m INT    Specification of the gain/loss model. 0: the BDARD model 1: the BD model 2: the C&M model 3: the BDI model [default: 0]
         -k INT    The number of mixture components in the phylogenetic mixture model [default: 5]
+	-n INT    Specification of the heterogeneity model. 0: the PM model 1: the PDF model 2: the Gamma model [default: 0]
         
     estimate: only estimate ancestral genome
     

@@ -16,6 +16,7 @@ class Mirage{
     _dim = 0;
     _number_of_samples = 0;
     _model_id = 0;
+    _mixture_method_id = 0;
   }
   void Train(MirageParameters& parameters);
   void Estimate(MirageParameters& parameters);
@@ -23,6 +24,7 @@ class Mirage{
   int _number_of_mixtures;
   int _dim;
   int _model_id;
+  int _mixture_method_id;
   int _number_of_samples;
   vector<vector<double> > _column_log_likelihood;
   vector<vector<vector<double> > > _init_prob_sufficient_statistics;
@@ -40,6 +42,8 @@ class Mirage{
   void SaveOldParameter(MirageParameters& m_parameter, Parameter& old_parameter);
   void Output(MirageParameters& parameters, int id);
   void Initiallize(MirageParameters& parameters);
+  void CalcRateParameter(vector<VectorXd>& fd, vector<MatrixXd>& ns, MirageParameters& parameters);
+  void CalcGammaParameter(MirageParameters& parameters);
   int NsId(int j, int k);
   complex<double> Kappa(complex<double> a, complex<double> b);
   double DerivMatrixExp(VectorXcd& eigen_values, MatrixXcd& eigen_vectors, MatrixXcd& inversed_eigen_vectors, int a, int b, int k, int l);
@@ -48,10 +52,12 @@ class Mirage{
   double CalcPartialAlpha(int mixture_id, VectorXd& fd, MatrixXd& ns, MirageParameters& parameters);
   double CalcPartialGamma(int mixture_id, VectorXd& fd, MatrixXd& ns, MirageParameters& parameters);
   void GradientDescent(int id, vector<VectorXd>& fd, vector<MatrixXd>& ns, MirageParameters& parameters);
-  double Qem(VectorXd& fd, MatrixXd& ns, double a, double g);
+  double Qem(VectorXd& fd, MatrixXd& ns, double a, double g, double rate_factor);
   void SetOldParameter(Parameter& old_parameter, MirageParameters& m_parameter);
   void HistoryReconstrucion(Node* current, MirageParameters& parameters);
   void HistoryTraceBack(ofstream& ofs, Node* current, int& count);
   void OutputReconstruction(ofstream& ofs, Node* current, int& count);
+  MatrixXd SetTempSubstitutionRateMatrix(MirageParameters& parameters);
+  void CheckInsideOutside(Node* current, int id);
 };
 #endif

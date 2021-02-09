@@ -7,7 +7,7 @@ void MirageParameters::SetTrainingParameters(int argc,char* argv[]){
   extern char *optarg;
   string input_file_name;
   
-  while ((c = getopt(argc, argv, "i:o:l:m:k:")) != -1) {
+  while ((c = getopt(argc, argv, "i:o:l:m:n:k:")) != -1) {
     switch (c) {
     case 'i':
       input_file_name = optarg;
@@ -24,6 +24,18 @@ void MirageParameters::SetTrainingParameters(int argc,char* argv[]){
 
     case 'm':
       _model_id = atoi(optarg);
+      if(_model_id < 0 || _model_id > 3){
+	cout << "Error: Invalid model id" << endl;
+	exit(1);
+      }
+      break;
+
+    case 'n':
+      _mixture_method_id = atoi(optarg);
+      if(_mixture_method_id < 0 || _mixture_method_id > 2){
+	cout << "Error: Invalid model id" << endl;
+	exit(1);
+      }
       break;
       
     case 'k':
@@ -60,8 +72,6 @@ void MirageParameters::SetEstimationParameters(int argc,char* argv[]){
       _output_file_name = optarg;
       break;
 
-    
-
     default:
       cerr << "The argument is an invalid command." << endl;
       exit(1); 
@@ -92,8 +102,16 @@ void MirageParameters::SetMixtureProbability(int i, double value){
   _mixture_probability[i] = value;
 }
 
+void MirageParameters::SetRateParameter(int i, double value){
+  _rate_parameter[i] = value;
+}
+
 void MirageParameters::SetInitProb(int i, int j, double value){
   _init_prob[i](j) = value;
+}
+
+void MirageParameters::SetGammaDistributionParameter(double value){
+  _gamma_distribution_parameter = value;
 }
 
 int MirageParameters::GetLoopMax(void){
@@ -104,12 +122,20 @@ double MirageParameters::GetLoopThreshold(void){
   return _loop_threshold;
 }
 
+double MirageParameters::GetGammaDistributionParameter(void){
+  return _gamma_distribution_parameter;
+}
+
 int MirageParameters::GetMaxNumber(void){
   return _max_number;
 }
 
 int MirageParameters::GetModelID(void){
   return _model_id;
+}
+
+int MirageParameters::GetMixtureMethodID(void){
+  return _mixture_method_id;
 }
 
 int MirageParameters::GetNumberOfMixtures(void){
@@ -161,6 +187,10 @@ double MirageParameters::GetMixtureProbability(int i){
   return _mixture_probability[i];
 }
 
+double MirageParameters::GetRateParameter(int i){
+  return _rate_parameter[i];
+}
+
 double MirageParameters::GetAlpha(int i){
   return _alpha[i];
 }
@@ -174,6 +204,44 @@ double MirageParameters::GetParameter(int i, int j){
   return _parameter[i][j];
 }
 
+double MirageParameters::GetGammaRate(int i, int j){
+  return _gamma_rate[i][j];
+}
+
+void MirageParameters::CalcAllGammaRate(){
+  _gamma_rate.resize(1000, vector<double>(_number_of_mixtures, 0.0));
+  
+  for(int i = 1; i <= 1000; i++){
+    vector<double> temp_vector = CalcGammaRate(i*0.01);
+    for(int j =0; j < _number_of_mixtures; j++){
+      _gamma_rate[i-1][j] = temp_vector[j];
+    }
+  }
+}
+
+vector<double> MirageParameters::CalcGammaRate(double g){
+  random_device rnd;
+  mt19937 mt(rnd());
+  vector<double> rate_parameter; rate_parameter.resize(_number_of_mixtures);
+  
+  gamma_distribution<> gamma_dist(g, 1.0/g);
+  vector<double> sample_vector;
+  for (int i = 0; i < _gamma_dist_sample_size; ++i) {
+    sample_vector.push_back(gamma_dist(mt));
+  }
+  sort(sample_vector.begin(), sample_vector.end());
+
+  int div = _gamma_dist_sample_size/_number_of_mixtures;
+  for(int i = 0; i < _number_of_mixtures; i++){
+    double sum = 0;
+    for(int j = div*i; j < div*(i+1); j++){
+      sum  += sample_vector[j];
+    }
+    rate_parameter[i] = sum/(double)div;
+  }
+  return(rate_parameter);
+}
+
 void MirageParameters::ReadParameter(string file_name){
   ifstream fp;
   fp.open(file_name.c_str(), ios::in);
@@ -182,37 +250,54 @@ void MirageParameters::ReadParameter(string file_name){
     exit(1);
   }
   fp >> _max_number;
-  _dim = _max_number+1;
+  _dim = _max_number+1;  
   fp >> _model_id;
+  fp >> _mixture_method_id;
   fp >> _number_of_mixtures;
   
+  int number_of_raw_matricies = _mixture_method_id == 0 ? _number_of_mixtures : 1;  
   _mixture_probability.resize(_number_of_mixtures, 0.0);
-  _init_prob.resize(_number_of_mixtures,VectorXd::Zero(_dim));
+  _init_prob.resize(number_of_raw_matricies, VectorXd::Zero(_dim));
 
   if(_model_id == 0){
-    _parameter.resize(_number_of_mixtures, vector<double>((_dim - 1)*2, 0.0));
-    
+    _parameter.resize(number_of_raw_matricies, vector<double>((_dim - 1)*2, 0.0));
   }else if(_model_id == 1){
-    _alpha.resize(_number_of_mixtures, 0.0);
-    _beta.resize(_number_of_mixtures, 0.0);
+    _alpha.resize(number_of_raw_matricies, 0.0);
+    _beta.resize(number_of_raw_matricies, 0.0);
     
   }else if(_model_id == 2 || _model_id == 3){
-    _alpha.resize(_number_of_mixtures, 0.0);
-    _beta.resize(_number_of_mixtures, 0.0);
-    _gamma.resize(_number_of_mixtures, 0.0);
-    
+    _alpha.resize(number_of_raw_matricies, 0.0);
+    _beta.resize(number_of_raw_matricies, 0.0);
+    _gamma.resize(number_of_raw_matricies, 0.0);      
+  }
+
+  if(_mixture_method_id <= 1){    
+    for(int i = 0; i < _number_of_mixtures; i++){
+      fp >> _mixture_probability[i];
+    }
   }else{
-    cout << "Error: Invalid model id" << endl;
-    exit(1);
+    for(int i = 0; i < _number_of_mixtures; i++){
+      _mixture_probability[i] = 1.0/_number_of_mixtures;
+    }
   }
- 
-  for(int i = 0; i < _number_of_mixtures; i++){
-    fp >> _mixture_probability[i];
+
+  if(_mixture_method_id == 1){
+    _rate_parameter.resize(_number_of_mixtures, 0.0);
+    for(int i = 0; i < _number_of_mixtures; i++){
+      fp >> _rate_parameter[i];
+    }
+  }else if(_mixture_method_id == 2){
+    _rate_parameter.resize(_number_of_mixtures, 0.0);
+    fp >> _gamma_distribution_parameter;
+    vector<double> rate_vector = CalcGammaRate(_gamma_distribution_parameter);
+    for(int i = 0; i < _number_of_mixtures; i++){
+      _rate_parameter[i] = rate_vector[i];
+    }
   }
-  
-  for(int i = 0; i < _number_of_mixtures; i++){
+
+  for(int i = 0; i < number_of_raw_matricies; i++){
     for(int j = 0; j < _dim; j++){
-      fp >> _init_prob[i](j);    
+      fp >> _init_prob[i](j);
     }
     if(_model_id == 1){
       fp >> _alpha[i] >> _beta[i];
@@ -224,6 +309,7 @@ void MirageParameters::ReadParameter(string file_name){
       }
     }
   }
+  
   _substitution_rate_matrix.resize(_number_of_mixtures, MatrixXd::Zero(_dim,_dim));
   SetSubstitutionRateMatrix();
 }
@@ -232,34 +318,57 @@ void MirageParameters::SetSubstitutionRateMatrix(){
   for(int i = 0; i < _number_of_mixtures; i++){
     _substitution_rate_matrix[i] = MatrixXd::Zero(_dim,_dim);
     if(_model_id == 1){
-      for(int j = 0; j < _dim-1; j++){
-	_substitution_rate_matrix[i](j, j+1) = _alpha[i];
-      }
-      for(int j = 1; j < _dim; j++){
-	_substitution_rate_matrix[i](j, j-1) = _beta[i];
+      if(_mixture_method_id == 0){
+	for(int j = 0; j < _dim-1; j++){	
+	  _substitution_rate_matrix[i](j, j+1) = _alpha[i];
+	  _substitution_rate_matrix[i](j+1, j) = _beta[i];
+	}
+      }else{
+	for(int j = 0; j < _dim-1; j++){	
+	  _substitution_rate_matrix[i](j, j+1) = _rate_parameter[i]*_alpha[0];
+	  _substitution_rate_matrix[i](j+1, j) = _rate_parameter[i]*_beta[0];
+	}
       }
     }else if(_model_id == 2){
-      for(int j = 0; j < _dim-1; j++){
-	_substitution_rate_matrix[i](j, j+1) += _alpha[i]+j*_gamma[i];
-      }
-      for(int j = 1; j < _dim; j++){
-	_substitution_rate_matrix[i](j, j-1) += j*_beta[i];
+      if(_mixture_method_id == 0){
+	for(int j = 0; j < _dim-1; j++){	
+	  _substitution_rate_matrix[i](j, j+1) += _alpha[i]+j*_gamma[i];
+	  _substitution_rate_matrix[i](j+1, j) += (j+1)*_beta[i];
+	}
+      }else{
+	for(int j = 0; j < _dim-1; j++){	
+	  _substitution_rate_matrix[i](j, j+1) += _rate_parameter[i]*(_alpha[0]+j*_gamma[0]);
+	  _substitution_rate_matrix[i](j+1, j) += _rate_parameter[i]*(j+1)*_beta[0];
+	}
       }
     }else if(_model_id == 0){
-      for(int j = 0; j < _dim-1; j++){
-	_substitution_rate_matrix[i](j, j+1) += _parameter[i][j];
-      }
-      for(int j = 1; j < _dim; j++){
-	_substitution_rate_matrix[i](j, j-1) += _parameter[i][_dim-1+j-1];
+      if(_mixture_method_id == 0){
+	for(int j = 0; j < _dim-1; j++){	  
+	  _substitution_rate_matrix[i](j, j+1) += _parameter[i][j];
+	  _substitution_rate_matrix[i](j+1, j) += _parameter[i][_dim-1+j];
+	}
+      }else{
+	for(int j = 0; j < _dim-1; j++){	  
+	  _substitution_rate_matrix[i](j, j+1) += _rate_parameter[i]*_parameter[0][j];
+	  _substitution_rate_matrix[i](j+1, j) += _rate_parameter[i]*_parameter[0][_dim-1+j];
+	}
       }
     }else{
-      _substitution_rate_matrix[i](0, 1) = _gamma[i];
-       for(int j = 1; j < _dim-1; j++){
-	 _substitution_rate_matrix[i](j, j+1) = _alpha[i];
-       }
-       for(int j = 1; j < _dim; j++){
-	 _substitution_rate_matrix[i](j, j-1) = _beta[i];
-       }
+      if(_mixture_method_id == 0){
+	_substitution_rate_matrix[i](0, 1) = _gamma[i];
+	_substitution_rate_matrix[i](1, 0) = _beta[i];
+	for(int j = 1; j < _dim-1; j++){
+	  _substitution_rate_matrix[i](j, j+1) = _alpha[i];
+	  _substitution_rate_matrix[i](j+1, j) = _beta[i];
+	}
+      }else{
+	_substitution_rate_matrix[i](0, 1) = _rate_parameter[i]*_gamma[0];
+	_substitution_rate_matrix[i](1, 0) = _rate_parameter[i]*_beta[0];
+	for(int j = 1; j < _dim-1; j++){
+	  _substitution_rate_matrix[i](j, j+1) = _rate_parameter[i]*_alpha[0];
+	  _substitution_rate_matrix[i](j+1, j) = _rate_parameter[i]*_beta[0];
+	}
+      }
     }
     
 
@@ -396,62 +505,94 @@ void MirageParameters::ParseTree(string& newick, vector<Node*>& leaf_list){
 }
 
 void MirageParameters::ParameterInitialization(){
-  _mixture_probability.resize(_number_of_mixtures, 0.0);
-  _init_prob.resize(_number_of_mixtures, VectorXd::Zero(_dim));
+  
+  _mixture_probability.resize(_number_of_mixtures, 0.0);  
+  int number_of_raw_matricies = _mixture_method_id == 0 ? _number_of_mixtures : 1;
+  _init_prob.resize(number_of_raw_matricies, VectorXd::Zero(_dim));
+
   _substitution_rate_matrix.resize(_number_of_mixtures, MatrixXd::Zero(_dim,_dim));
   random_device rnd;
-  mt19937 mt(rnd());
+  int temp = rnd();
+  mt19937 mt(temp);
 
-  int sum = 0;
-  for(int i = 0; i < _number_of_mixtures; i++){
-    _mixture_probability[i] = mt()%1000+1;    
-    sum +=  _mixture_probability[i];
+  if(_mixture_method_id <= 1){
+    int sum = 0;
+    for(int i = 0; i < _number_of_mixtures; i++){
+      _mixture_probability[i] = mt()%1000+1;    
+      sum +=  _mixture_probability[i];
+    }
+    for(int i = 0; i < _number_of_mixtures; i++){
+      _mixture_probability[i] /= sum;
+    }
+  }else{
+    for(int i = 0; i < _number_of_mixtures; i++){
+      _mixture_probability[i] = 1.0/_number_of_mixtures;
+    }
   }
-  for(int i = 0; i < _number_of_mixtures; i++){
-    _mixture_probability[i] /= sum;
-  }  
-
   
-  for(int i = 0; i < _number_of_mixtures; i++){
-    sum = 0;
+  for(int i = 0; i < number_of_raw_matricies; i++){
+    int sum = 0;
     for(int j = 0; j < _dim; j++){
       _init_prob[i](j) = mt()%1000+1;
       sum +=  _init_prob[i](j);
     }
     for(int j = 0; j < _dim; j++){
       _init_prob[i](j) /=sum;
-    }    
+      
+    }
   }
-
+  
+  if(_mixture_method_id >= 1){
+    _max_init = 1.5;
+  }
   uniform_real_distribution<double> uniform_distribution(_min_init, _max_init);
   
   if(_model_id == 1){
-    _alpha.resize(_number_of_mixtures, 0.0);
-    _beta.resize(_number_of_mixtures, 0.0);
+    _alpha.resize(number_of_raw_matricies, 0.0);
+    _beta.resize(number_of_raw_matricies, 0.0);
     
-    for(int i = 0; i < _number_of_mixtures; i++){
-      _alpha[i] = uniform_distribution(rnd);
-      _beta[i] = uniform_distribution(rnd);
+    for(int i = 0; i < number_of_raw_matricies; i++){
+      _alpha[i] = uniform_distribution(mt);
+      _beta[i] = uniform_distribution(mt);
     }
     
   }else if(_model_id == 2 || _model_id == 3){
-    _alpha.resize(_number_of_mixtures, 0.0);
-    _beta.resize(_number_of_mixtures, 0.0);
-    _gamma.resize(_number_of_mixtures, 0.0);
+    _alpha.resize(number_of_raw_matricies, 0.0);
+    _beta.resize(number_of_raw_matricies, 0.0);
+    _gamma.resize(number_of_raw_matricies, 0.0);
     
-    for(int i = 0; i < _number_of_mixtures; i++){
-      _alpha[i] = uniform_distribution(rnd);
-      _beta[i] = uniform_distribution(rnd);
-      _gamma[i] = uniform_distribution(rnd);
+    for(int i = 0; i < number_of_raw_matricies; i++){
+      _alpha[i] = uniform_distribution(mt);
+      _beta[i] = uniform_distribution(mt);
+      _gamma[i] = uniform_distribution(mt);
     }
-    
   }else{
-    _parameter.resize(_number_of_mixtures, vector<double>((_dim - 1)*2, 0.0));
-    for(int i = 0; i < _number_of_mixtures; i++){
+    _parameter.resize(number_of_raw_matricies, vector<double>((_dim - 1)*2, 0.0));
+    for(int i = 0; i < number_of_raw_matricies; i++){
       for(int j = 0; j < (_dim - 1)*2 ; j++){
-	_parameter[i][j] = uniform_distribution(rnd);
+	_parameter[i][j] = uniform_distribution(mt);
       }
     }
+  }
+
+  if(_mixture_method_id ==1){
+    _rate_parameter.resize(_number_of_mixtures, 0.0);
+    uniform_real_distribution<double> uniform_distribution_r(1.0, _max_rate);
+    double rate_sum = 0.0;
+    for(int i = 0; i < _number_of_mixtures; i++){
+      _rate_parameter[i] =  uniform_distribution_r(mt);
+      rate_sum += _rate_parameter[i] * _mixture_probability[i];
+    }
+    for(int i = 0; i < _number_of_mixtures; i++){
+      _rate_parameter[i] /=  rate_sum;
+    }
+  }else if(_mixture_method_id == 2){
+    _rate_parameter.resize(_number_of_mixtures, 0.0);
+    CalcAllGammaRate();
+    for(int i = 0; i < _number_of_mixtures; i++){
+      _rate_parameter[i] = _gamma_rate[99][i];
+    }
+
   }
   SetSubstitutionRateMatrix();
 }

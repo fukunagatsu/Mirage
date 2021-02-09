@@ -9,7 +9,7 @@ void Mirage::Train(MirageParameters& parameters){
   int count = 0;
   Parameter old_parameter;
   while(true){
-    cout << "loop:" << count << endl;      
+    cout << "loop:" << count << endl;
     count++;
     CalcInsideValues(parameters.GetRoot(), parameters);
     CalcColumnLogLikelihood(parameters.GetRoot(), parameters);
@@ -17,11 +17,13 @@ void Mirage::Train(MirageParameters& parameters){
     CalcTreeModelSufficientStatistics(parameters.GetRoot(), parameters, -1);
     CalcResponsibility(parameters);
     SaveOldParameter(parameters,old_parameter);
-    
-    bool flag = NewParameterEstimation(parameters.GetRoot(),parameters);
+
+    bool flag = true;
+    flag = NewParameterEstimation(parameters.GetRoot(),parameters);
     if(!flag){break;}
     
     new_log_likelihood = CalcDataLikelihood(parameters);
+    cout << new_log_likelihood << endl;
     if(old_log_likelihood != 0.0){
       double value = new_log_likelihood - old_log_likelihood;
       if(count > parameters.GetLoopMax()  || new_log_likelihood - old_log_likelihood < parameters.GetLoopThreshold() ){	
@@ -32,9 +34,15 @@ void Mirage::Train(MirageParameters& parameters){
 
     old_log_likelihood = new_log_likelihood;
   }
+  if(_mixture_method_id == 2){
+    CalcGammaParameter(parameters);
+    CalcInsideValues(parameters.GetRoot(), parameters);
+    CalcColumnLogLikelihood(parameters.GetRoot(), parameters);
+  }
   HistoryReconstrucion(parameters.GetRoot(), parameters);
   Output(parameters,0);
 }
+
 
 void Mirage::Estimate(MirageParameters& parameters){
   Initiallize(parameters);  
@@ -42,7 +50,7 @@ void Mirage::Estimate(MirageParameters& parameters){
   CalcColumnLogLikelihood(parameters.GetRoot(), parameters);
   CalcResponsibility(parameters);
   HistoryReconstrucion(parameters.GetRoot(), parameters);  
-  Output(parameters,1);  
+  Output(parameters,1);
 }
 
 void Mirage::OutputReconstruction(ofstream& ofs, Node* current, int& count){
@@ -63,7 +71,7 @@ void Mirage::HistoryTraceBack(ofstream& ofs, Node* current, int& count){
   if(current->parent != NULL){    
     for(int i = 0; i < _number_of_samples; i++){      
       current->reconstruction[i] = current->c[GetTripleArrayId(i,_mixture_id[i],current->parent->reconstruction[i])];
-    }     
+    }
   }
   OutputReconstruction(ofs,current,count);
   
@@ -137,8 +145,9 @@ void Mirage::HistoryReconstrucion(Node* current, MirageParameters& parameters){
       double max_logL = -DBL_MAX;
 	
       for(int i = 0; i < _number_of_mixtures; i++){
+	int temp_i = _mixture_method_id == 0 ? i : 0;
 	for(int k = 0; k < _dim; k++){
-	  double temp = parameters.GetInitProb(i,k) +
+	  double temp = parameters.GetInitProb(temp_i,k) +
 	    current->left->logL[GetTripleArrayId(j,i,k)] + current->right->logL[GetTripleArrayId(j,i,k)];
 	  if(temp > max_logL){
 	    max_logL = temp;
@@ -156,13 +165,28 @@ void Mirage::Output(MirageParameters& parameters, int id){
   string file_name = parameters.GetOutputFileName();
   if(id == 0){
     ofstream ofs_par((file_name+".par").c_str());
-    ofs_par << _dim-1 << " " << parameters.GetModelID() << " " << _number_of_mixtures << endl;
-    for(int i = 0; i < _number_of_mixtures; i++){
-      ofs_par << parameters.GetMixtureProbability(i) << " ";
+    ofs_par << _dim-1 << " " << parameters.GetModelID() << " " <<
+      parameters.GetMixtureMethodID() << " " << _number_of_mixtures << endl;
+
+    if(_mixture_method_id <= 1){
+      for(int i = 0; i < _number_of_mixtures; i++){
+	ofs_par << parameters.GetMixtureProbability(i) << " ";
+      } 
+      ofs_par << endl;
     }
-    ofs_par << endl;
+
+    if(_mixture_method_id == 1){
+      for(int i = 0; i < _number_of_mixtures; i++){
+	ofs_par << parameters.GetRateParameter(i) << " ";
+      } 
+      ofs_par << endl;
+    }else if(_mixture_method_id == 2){
+      ofs_par << parameters.GetGammaDistributionParameter() <<endl;
+    }
+
+    int number_of_raw_matricies = _mixture_method_id == 0 ? _number_of_mixtures : 1;
     
-    for(int i = 0; i < _number_of_mixtures; i++){
+    for(int i = 0; i < number_of_raw_matricies; i++){
       for(int j = 0; j < _dim; j++){
 	ofs_par << parameters.GetInitProb(i,j) << " ";
       }
@@ -184,20 +208,23 @@ void Mirage::Output(MirageParameters& parameters, int id){
   ofstream ofs_bas((file_name+".bas").c_str());
   ofs_bas << "Max_Number: " << _dim-1 << endl;
   ofs_bas << "Model_ID: " << parameters.GetModelID() << endl;
+   ofs_bas << "Mixture_Method_ID: " << parameters.GetMixtureMethodID() << endl;
   ofs_bas << "Number_of_Mixtures: " << _number_of_mixtures << endl;
   ofs_bas << "Log_Likelihood: " << CalcDataLikelihood(parameters) << endl;
   ofs_bas.close();
 
-  ofstream ofs_res((file_name+".res").c_str());
-  
-  for(int i = 0; i < _number_of_samples; i++){
-    for(int j = 0; j < _number_of_mixtures; j++){
-      ofs_res<< _responsibility[i][j] << " ";
+  if(_mixture_method_id  <= 1){
+    ofstream ofs_res((file_name+".res").c_str());
+    
+    for(int i = 0; i < _number_of_samples; i++){
+      for(int j = 0; j < _number_of_mixtures; j++){
+	ofs_res<< _responsibility[i][j] << " ";
+      }
+      ofs_res << endl;
     }
-    ofs_res << endl;
+    ofs_res.close();
   }
-  ofs_res.close();
-
+  
   ofstream ofs_hist((file_name+".ahr").c_str());
   int count = 0;
   HistoryTraceBack(ofs_hist,parameters.GetRoot(), count);
@@ -209,126 +236,293 @@ void Mirage::Initiallize(MirageParameters& parameters){
   _dim = parameters.GetDim();
   _number_of_samples = parameters.GetNumberOfSamples();
   _model_id = parameters.GetModelID();
+  _mixture_method_id = parameters.GetMixtureMethodID();
   _column_log_likelihood.resize(_number_of_samples, vector<double>(_number_of_mixtures, 0.0));
   _init_prob_sufficient_statistics.resize(_number_of_samples, vector<vector<double> >(_number_of_mixtures, vector<double>(_dim, 0.0)));
+
   _responsibility.resize(_number_of_samples, vector<double>(_number_of_mixtures, 0.0));
+
   _mixture_id.resize(_number_of_samples, 0.0);
 }
 
-bool Mirage::NewParameterEstimation(Node* current, MirageParameters& parameters){
-  vector<double> sum_responsibility(_number_of_mixtures, 0.0);
+MatrixXd Mirage::SetTempSubstitutionRateMatrix(MirageParameters& parameters){  
+  MatrixXd temp_rate_matrix = MatrixXd::Zero(_dim,_dim);
+  if(_model_id == 1){
+    for(int j = 0; j < _dim-1; j++){	
+      temp_rate_matrix(j, j+1) = parameters.GetAlpha(0);
+      temp_rate_matrix(j+1, j) = parameters.GetBeta(0);
+    }
+  }else if(_model_id == 2){
+    for(int j = 0; j < _dim-1; j++){	
+      temp_rate_matrix(j, j+1) += (parameters.GetAlpha(0)+j*parameters.GetGamma(0));
+      temp_rate_matrix(j+1, j) += (j+1)*parameters.GetBeta(0);
+    }
+  }else if(_model_id == 0){
+    for(int j = 0; j < _dim-1; j++){	  
+      temp_rate_matrix(j, j+1) += parameters.GetParameter(0,j);
+      temp_rate_matrix(j+1, j) += parameters.GetParameter(0,_dim-1+j);
+    }
+  }else{
+    temp_rate_matrix(0, 1) = parameters.GetGamma(0);
+    for(int j = 1; j < _dim; j++){
+      if(j != _dim-1){
+	temp_rate_matrix(j, j+1) = parameters.GetAlpha(0);
+      }
+      temp_rate_matrix(j, j-1) = parameters.GetBeta(0);
+    }
+  }
+    
+  for(int j = 0; j < _dim ; j++){
+    if(j != 0){
+      temp_rate_matrix(j, j) += -temp_rate_matrix(j, j-1);
+    }
+    if(j != _dim-1){
+      temp_rate_matrix(j, j) += -temp_rate_matrix(j, j+1);
+    }
+  }
+  return temp_rate_matrix;
+}
+
+void Mirage::CalcGammaParameter(MirageParameters& parameters){
+  double temp_i = -1;
+  double temp_sum = DBL_MAX;
+  for(int i = 0; i < 1000; i++){
+    double sum = 0.0;
+    for(int j = 0; j < _number_of_mixtures; j++){
+      double diff = parameters.GetRateParameter(j) - parameters.GetGammaRate(i, j);	
+      sum += pow(diff, 2);
+    }
+    sum = sqrt(sum);
+    if(sum < temp_sum){
+      temp_i = i;
+      temp_sum = sum;
+    }
+  }
+  parameters.SetGammaDistributionParameter((temp_i+1)*0.01);
+  for(int i = 0; i < _number_of_mixtures; i++){
+    parameters.SetRateParameter(i, parameters.GetGammaRate(temp_i,i));
+  }
+  parameters.SetSubstitutionRateMatrix();
+}
+
+void Mirage::CalcRateParameter(vector<VectorXd>& fd, vector<MatrixXd>& ns, MirageParameters& parameters){
+  
+  vector<double> rate_vector; rate_vector.resize(_number_of_mixtures,0.0);
+  double rate_sum = 0.0;
+  for(int i = 0; i < _number_of_mixtures; i++){    
+    MatrixXd rate_matrix = SetTempSubstitutionRateMatrix(parameters);
+    double denominator = rate_matrix(0, 0) * fd[i](0);
+    double numerator = 0.0;
+    
+    for(int j = 1; j < _dim; j++){
+      numerator += ns[i](j, j-1);
+      numerator += ns[i](j-1, j);
+      denominator += rate_matrix(j, j) * fd[i](j);
+    }
+    rate_vector[i] = -numerator/denominator;
+    rate_sum += rate_vector[i]*parameters.GetMixtureProbability(i);
+  }
+  
+  for(int i = 0; i < _number_of_mixtures; i++){
+    parameters.SetRateParameter(i, rate_vector[i]/rate_sum);
+  }
+  
+  if(_model_id == 0){
+    for(int j = 0; j < (_dim - 1)*2; j++){
+      parameters.SetParameter(0, j, parameters.GetParameter(0, j)*rate_sum);
+    }
+  }else if(_model_id == 1){
+    parameters.SetBeta(0, parameters.GetBeta(0)*rate_sum);
+    parameters.SetAlpha(0, parameters.GetAlpha(0)*rate_sum);
+  }else{
+    parameters.SetBeta(0, parameters.GetBeta(0)*rate_sum);
+    parameters.SetAlpha(0, parameters.GetAlpha(0)*rate_sum);
+    parameters.SetGamma(0, parameters.GetGamma(0)*rate_sum);
+  }
+}
+
+void Mirage::CheckInsideOutside(Node* current, int id){
+  for(int i = 0; i < _number_of_samples; i++){
+    double temp = 0.0;
+    for(int j = 0; j < _dim; j++){
+      temp += fmath::expd(current->outside_values[GetTripleArrayId(i,id,j)]+current->inside_values[GetTripleArrayId(i,id,j)] - _column_log_likelihood[i][id]);
+    }
+    cout << temp << endl;
+  }
+  
+  if(current->left == NULL && current->right == NULL){
+    return;
+  }
+  if(current->left != NULL){
+    CheckInsideOutside(current->left, id);
+  }
+  if(current->right != NULL){
+    CheckInsideOutside(current->right, id);
+  }
+}
+
+bool Mirage::NewParameterEstimation(Node* current, MirageParameters& parameters){ 
   vector<VectorXd> init(_number_of_mixtures, VectorXd::Zero(_dim));
   vector<VectorXd> fd(_number_of_mixtures, VectorXd::Zero(_dim));
   vector<MatrixXd> ns(_number_of_mixtures, MatrixXd::Zero(_dim, _dim));
   CalcTotalSS(current, init,fd,ns);
-  
+
+  double sum_init = 0.0;
   for(int i = 0; i < _number_of_mixtures; i++){
-    if(_model_id == 1){
-      double beta_numerator = 0.0;
-      double beta_denominator = 0.0;
-      for(int j = 1; j < _dim; j++){
-	beta_numerator += ns[i](j, j-1);
-	beta_denominator += fd[i](j);
+    vector<double> sum_responsibility(_number_of_mixtures, 0.0);
+    if(_mixture_method_id <= 1){      
+      for(int j = 0; j < _number_of_samples; j++){
+	sum_responsibility[i] += _responsibility[j][i];
       }
-      double alpha_numerator = 0.0;
-      double alpha_denominator = 0.0;
-      for(int j = 0; j < _dim-1; j++){
-	alpha_numerator += ns[i](j, j+1);
-	alpha_denominator += fd[i](j);
-      }
-      double beta = beta_numerator/beta_denominator;
-      double alpha = alpha_numerator/alpha_denominator;
-      if(beta < 0.0 || alpha < 0.0
-	 || std::isnan(beta) || std::isnan(alpha)){
-	return(false);
-      }
-      
-      parameters.SetBeta(i, beta);
-      parameters.SetAlpha(i, alpha);
-    }else if(_model_id == 2){
-      double beta_numerator = 0.0;
-      double beta_denominator = 0.0;
-      for(int j = 1; j < _dim; j++){
-	beta_numerator += ns[i](j, j-1);
-	beta_denominator += j*fd[i](j);
-      }
-      double beta = beta_numerator/beta_denominator;
-      if(beta < 0.0 || std::isnan(beta)){return(false);}
-      parameters.SetBeta(i, beta);
-      
-      GradientDescent(0, fd, ns, parameters); //alpha
-      GradientDescent(1, fd, ns, parameters); //gamma
-    }else if(_model_id == 0){
-      for(int j = 0; j < _dim - 1; j++){
-	double value = ns[i](j, j+1)/fd[i](j);
-	if(value < 0.0 || std::isnan(value)){return(false);}
-      }
-      for(int j = 1; j < _dim; j++){
-	double value = ns[i](j, j-1)/fd[i](j);
-	if(value < 0.0 || std::isnan(value)){return(false);}
-      }
-      
-      for(int j = 0; j < _dim - 1; j++){
-	parameters.SetParameter(i, j, ns[i](j, j+1)/fd[i](j));
-      }
-      for(int j = 1; j < _dim; j++){
-	parameters.SetParameter(i, _dim-1+j-1, ns[i](j, j-1)/fd[i](j));
-      }
-    }else{
-      double beta_numerator = 0.0;
-      double beta_denominator = 0.0;
-      for(int j = 1; j < _dim; j++){
-	beta_numerator += ns[i](j, j-1);
-	beta_denominator += fd[i](j);
-      }
-      double alpha_numerator = 0.0;
-      double alpha_denominator = 0.0;
-      for(int j = 1; j < _dim-1; j++){
-	alpha_numerator += ns[i](j, j+1);
-	alpha_denominator += fd[i](j);
-      }
-      double beta = beta_numerator/beta_denominator;
-      double alpha = alpha_numerator/alpha_denominator;
-      double gamma = ns[i](0, 1)/fd[i](0);
-      if(beta < 0.0 || alpha < 0.0 || gamma < 0.0
-	 || std::isnan(beta) || std::isnan(alpha) || std::isnan(gamma)){
-	return(false);
-      }
-      
-      parameters.SetBeta(i, beta);
-      parameters.SetAlpha(i, alpha);
-      parameters.SetGamma(i, gamma);
+      parameters.SetMixtureProbability(i, sum_responsibility[i]/_number_of_samples);
     }
     
-    for(int j = 0; j < _number_of_samples; j++){
-      sum_responsibility[i] += _responsibility[j][i];
-    }
-    parameters.SetMixtureProbability(i, sum_responsibility[i]/_number_of_samples);
-
-    for(int j = 0; j < _dim; j++){
-      parameters.SetInitProb(i,j, init[i](j)/sum_responsibility[i]);
+    if(_mixture_method_id == 0){
+      for(int j = 0; j < _dim; j++){
+	parameters.SetInitProb(i,j, init[i](j)/sum_responsibility[i]);
+      }
+    }else{
+      for(int j = 0; j < _dim; j++){
+	sum_init += init[i](j);
+      }
     }
   }
+
+  if(_mixture_method_id >= 1){
+    for(int j = 0; j < _dim; j++){
+      double temp = 0.0;
+      for(int i = 0; i < _number_of_mixtures; i++){
+	temp += init[i](j);
+      }
+      parameters.SetInitProb(0,j, temp/sum_init);
+    }
+  }
+  
+  if(_model_id == 0 || _model_id == 1 || _model_id == 3){
+    int outer_loop_size = _mixture_method_id == 0 ? _number_of_mixtures : 1;
+    int inner_loop_size = _mixture_method_id == 0 ? 1 : _number_of_mixtures;
+
+    for(int i = 0; i < outer_loop_size; i++){
+      vector<int> value_size_vector = {4*(_dim-1), 4, 0, 6};
+      int value_vector_size = value_size_vector[_model_id];
+      
+      vector<double> value_vector; value_vector.resize(value_vector_size, 0.0);
+
+      for(int j = 0; j < inner_loop_size; j++){
+	int mixture_index =  _mixture_method_id == 0 ? i : j;
+	double rate_factor = _mixture_method_id >= 1 ? parameters.GetRateParameter(mixture_index) : 1.0;
+	
+	for(int k = 1; k < _dim; k++){
+	  int bas = _model_id == 0 ? (k-1)*4 : 0;
+	  value_vector[bas] += ns[mixture_index](k, k-1);
+	  value_vector[bas+1] += rate_factor*fd[mixture_index](k);
+	  if(!(_model_id == 3 && k == 1)){
+	    value_vector[bas+2] += ns[mixture_index](k-1, k);
+	    value_vector[bas+3] += rate_factor*fd[mixture_index](k-1);
+	  }else{
+	    value_vector[4] += ns[mixture_index](k-1, k);
+	    value_vector[5] += rate_factor*fd[mixture_index](k-1);
+	  }
+	}
+
+      }
+      
+      for(int j = 0; j <value_vector_size; j+=2){
+	double value = value_vector[j]/value_vector[j+1];	
+	if(value < 0.0 || std::isnan(value)){return(false);}
+      }
+      
+      if(_model_id == 0){
+	for(int j = 0; j < _dim - 1; j++){
+	  parameters.SetParameter(i, j, value_vector[j*4+2] / value_vector[j*4+3]);
+	  parameters.SetParameter(i, _dim-1+j, value_vector[j*4] / value_vector[j*4+1]);
+	}
+      }else if(_model_id == 1){
+	parameters.SetBeta(i, value_vector[0]/value_vector[1]);
+	parameters.SetAlpha(i, value_vector[2]/value_vector[3]);
+      }else{
+	parameters.SetBeta(i, value_vector[0]/value_vector[1]);
+	parameters.SetAlpha(i, value_vector[2]/value_vector[3]);
+	parameters.SetGamma(i, value_vector[4]/value_vector[5]);
+      }
+    }
+  }else{
+    int outer_loop_size = _mixture_method_id == 0 ? _number_of_mixtures : 1;
+    int inner_loop_size = _mixture_method_id == 0 ? 1 : _number_of_mixtures;
+
+    for(int i = 0; i < outer_loop_size; i++){
+      double beta_numerator = 0.0;
+      double beta_denominator = 0.0;
+      
+       for(int j = 0; j < inner_loop_size; j++){
+	 int mixture_index =  _mixture_method_id == 0 ? i : j;
+	 double rate_factor = _mixture_method_id >= 1 ? parameters.GetRateParameter(mixture_index) : 1.0;
+	 
+	 
+	 for(int k = 1; k < _dim; k++){
+	   beta_numerator += ns[mixture_index](k, k-1);
+	   beta_denominator += rate_factor*k*fd[mixture_index](k);
+	 }	 
+       }
+       
+       double beta = beta_numerator/beta_denominator;
+       if(beta < 0.0 || std::isnan(beta)){return(false);}
+       parameters.SetBeta(i, beta);
+       GradientDescent(0, fd, ns, parameters); //alpha
+       GradientDescent(1, fd, ns, parameters); //gamma
+       
+    }
+  }
+
+  if(_mixture_method_id >= 1){    
+    CalcRateParameter(fd, ns, parameters);
+  } 
+    
   parameters.SetSubstitutionRateMatrix();
   return(true);
 }
 
-void Mirage::GradientDescent(int id, vector<VectorXd>& fd, vector<MatrixXd>& ns, MirageParameters& parameters){  
-  for(int i = 0; i < _number_of_mixtures; i++){
+void Mirage::GradientDescent(int id, vector<VectorXd>& fd, vector<MatrixXd>& ns, MirageParameters& parameters){
+  int outer_loop_size = _mixture_method_id == 0 ? _number_of_mixtures : 1;
+  int inner_loop_size = _mixture_method_id == 0 ? 1 : _number_of_mixtures;
+  
+  for(int i = 0; i < outer_loop_size; i++){
     bool break_flag = false;
     double weight = parameters.GetInitGradWeight();
     while(true){
-      double partial_par = id == 0 ? CalcPartialAlpha(i, fd[i], ns[i], parameters) : CalcPartialGamma(i, fd[i], ns[i], parameters);
+      
+      double partial_par = 0.0;
+      for(int j = 0; j < inner_loop_size; j++){
+	int mixture_index =  _mixture_method_id == 0 ? i : j;
+	if(id==0){
+	  partial_par += CalcPartialAlpha(mixture_index, fd[mixture_index], ns[mixture_index], parameters);
+	
+	}else{
+	  partial_par += CalcPartialGamma(mixture_index, fd[mixture_index], ns[mixture_index], parameters);
+	}
+      }
       
       if(abs(partial_par) < parameters.GetPartialParThreshold()){
 	break;
       }
       while(true){
 	double new_par = id == 0 ? parameters.GetAlpha(i) : parameters.GetGamma(i);
-	new_par += weight*partial_par;	
+
+	new_par += weight*partial_par;
 	if(new_par > 0.0){
-	  double new_q = id == 0 ? Qem(fd[i],ns[i],new_par,parameters.GetGamma(i)) : Qem(fd[i],ns[i],parameters.GetAlpha(i),new_par);
-	  double old_q =  Qem(fd[i],ns[i],parameters.GetAlpha(i),parameters.GetGamma(i));	 
+	  double new_q = 0.0; double old_q = 0.0;
+	  
+	  for(int j = 0; j < inner_loop_size; j++){
+	    int mixture_index =  _mixture_method_id == 0 ? i : j;
+	    double rate_factor = _mixture_method_id >= 1 ? parameters.GetRateParameter(mixture_index) : 1.0;
+	    
+	    if(id==0){
+	      new_q += Qem(fd[mixture_index],ns[mixture_index],new_par,parameters.GetGamma(i),rate_factor);
+	    }else{
+	      new_q += Qem(fd[mixture_index],ns[mixture_index],parameters.GetAlpha(i),new_par,rate_factor);
+	    }
+	    old_q += Qem(fd[mixture_index],ns[mixture_index],parameters.GetAlpha(i),parameters.GetGamma(i),rate_factor);
+	  }
 	  if(new_q > old_q){
 	    if(id == 0){
 	      parameters.SetAlpha(i, new_par);
@@ -352,13 +546,14 @@ void Mirage::GradientDescent(int id, vector<VectorXd>& fd, vector<MatrixXd>& ns,
   }
 }
 
-double Mirage::Qem(VectorXd& fd, MatrixXd& ns, double a, double g){
-  double temp = 0.0;
+double Mirage::Qem(VectorXd& fd, MatrixXd& ns, double a, double g, double rate_factor){
+  double temp = 0.0;  
+ 
   for(int i = 0; i < _dim-1; i++){
-    temp += -fd(i)*a;
-    temp += ns(i, i+1)*log(a + i *g);
+    temp += -fd(i)*rate_factor*a;
+    temp += ns(i, i+1)*log(rate_factor*a + i*rate_factor*g);
     if(i >= 1){
-      temp += -i*fd(i)*g;
+      temp += -i*fd(i)*rate_factor*g;
     }
   }
   return(temp);
@@ -366,8 +561,12 @@ double Mirage::Qem(VectorXd& fd, MatrixXd& ns, double a, double g){
 
 double Mirage::CalcPartialAlpha(int mixture_id, VectorXd& fd, MatrixXd& ns, MirageParameters& parameters){
   double temp = 0.0;
+  double rate_factor = _mixture_method_id >= 1 ? parameters.GetRateParameter(mixture_id) : 1.0;
+  if(_mixture_method_id >= 1){
+    mixture_id = 0;
+  }
   for(int i = 0; i < _dim-1; i++){
-    temp += -fd(i);
+    temp += -rate_factor*fd(i);
     temp += ns(i, i+1)/(parameters.GetAlpha(mixture_id) + i * parameters.GetGamma(mixture_id));
   }
   return temp/_number_of_samples;
@@ -375,8 +574,12 @@ double Mirage::CalcPartialAlpha(int mixture_id, VectorXd& fd, MatrixXd& ns, Mira
 
 double Mirage::CalcPartialGamma(int mixture_id,VectorXd& fd, MatrixXd& ns, MirageParameters& parameters){
   double temp = 0.0;
+  double rate_factor = _mixture_method_id >= 1 ? parameters.GetRateParameter(mixture_id) : 1.0;
+  if(_mixture_method_id >= 1){
+    mixture_id = 0;
+  }
   for(int i = 1; i < _dim-1; i++){
-    temp += -i*fd(i);
+    temp += -i*rate_factor*fd(i);
     temp += ns(i, i+1)/(parameters.GetAlpha(mixture_id) + i * parameters.GetGamma(mixture_id));
   }
   return temp/_number_of_samples ;
@@ -401,7 +604,7 @@ void Mirage::CalcTotalSS(Node* current, vector<VectorXd>& init, vector<VectorXd>
   }else{
     for(int i = 0; i < _number_of_mixtures; i++){
       for(int j = 0; j < _dim; j++){
-	for(int k = 0; k < _number_of_samples; k++){
+	for(int k = 0; k < _number_of_samples; k++){	
 	  init[i](j) += _responsibility[k][i]*_init_prob_sufficient_statistics[k][i][j];
 	}
       }
@@ -420,9 +623,20 @@ void Mirage::CalcTotalSS(Node* current, vector<VectorXd>& init, vector<VectorXd>
 }
 
 void Mirage::SetOldParameter(Parameter& old_parameter, MirageParameters& m_parameter){
-  for(int i = 0; i < _number_of_mixtures; i++){
-    m_parameter.SetMixtureProbability(i, old_parameter.mixture_probability[i]);
-    
+  int number_of_raw_matricies = _mixture_method_id == 0 ? _number_of_mixtures : 1;
+
+  if(_mixture_method_id == 1){
+    for(int i = 0; i < _number_of_mixtures; i++){
+      m_parameter.SetRateParameter(i, old_parameter.rate_parameter[i]);
+    }
+  }else if(_mixture_method_id == 2){
+    m_parameter.SetGammaDistributionParameter(old_parameter.gamma_distribution_parameter);
+  }
+  
+  for(int i = 0; i < number_of_raw_matricies; i++){
+    if(_mixture_method_id <= 1){
+      m_parameter.SetMixtureProbability(i, old_parameter.mixture_probability[i]);
+    }
     for(int j = 0; j < _dim; j++){
       m_parameter.SetInitProb(i, j, old_parameter.init_prob[i](j));    
     }
@@ -442,9 +656,22 @@ void Mirage::SetOldParameter(Parameter& old_parameter, MirageParameters& m_param
 }
 
 void Mirage::SaveOldParameter(MirageParameters& m_parameter, Parameter& old_parameter){
-  for(int i = 0; i < _number_of_mixtures; i++){
-    old_parameter.mixture_probability.resize(_number_of_mixtures,0.0);
-    old_parameter.mixture_probability[i] = m_parameter.GetMixtureProbability(i);
+  int number_of_raw_matricies = _mixture_method_id == 0 ? _number_of_mixtures : 1;
+
+  if(_mixture_method_id == 1){
+    old_parameter.rate_parameter.resize(_number_of_mixtures,0.0);
+    for(int i = 0; i < _number_of_mixtures; i++){
+      old_parameter.rate_parameter[i] = m_parameter.GetRateParameter(i);
+    }
+  }else if(_mixture_method_id == 2){
+    old_parameter.gamma_distribution_parameter = m_parameter.GetGammaDistributionParameter();
+  }
+
+  for(int i = 0; i < number_of_raw_matricies; i++){
+    if(_mixture_method_id <= 1){
+      old_parameter.mixture_probability.resize(_number_of_mixtures,0.0);
+      old_parameter.mixture_probability[i] = m_parameter.GetMixtureProbability(i);
+    }
     
     for(int j = 0; j < _dim; j++){
       old_parameter.init_prob.resize(_number_of_mixtures, VectorXd::Zero(_dim));
@@ -475,10 +702,11 @@ void Mirage::SaveOldParameter(MirageParameters& m_parameter, Parameter& old_para
 
 void Mirage::CalcOutsideValues(Node* current, MirageParameters& parameters, int id){
   for(int i = 0; i < _number_of_mixtures; i++){
+    int temp_i = _mixture_method_id == 0 ? i : 0;
     if(current->parent == NULL){
       for(int j = 0; j < _number_of_samples; j++){
 	for(int k = 0; k < _dim; k++){
-	  double temp_prob = parameters.GetInitProb(i,k);
+	  double temp_prob = parameters.GetInitProb(temp_i,k);
 	  current->outside_values[GetTripleArrayId(j,i,k)] = temp_prob != 0.0 ? log(temp_prob) : -DBL_MAX;
 	}
       }
@@ -559,7 +787,6 @@ void Mirage::CalcInsideValues(Node* current, MirageParameters& parameters){
   for(int i = 0; i < _number_of_mixtures; i++){
     MatrixXd left_probability_matrix = (current->left->edge_length * substitution_rate_matrix[i]).exp();
     MatrixXd right_probability_matrix = (current->right->edge_length * substitution_rate_matrix[i]).exp();
-  
     for(int j = 0; j < _number_of_samples; j++){
       for(int k = 0; k < _dim; k++){
 	double l_temp = -DBL_MAX;
@@ -590,25 +817,30 @@ void Mirage::CalcInsideValues(Node* current, MirageParameters& parameters){
 
 void Mirage::CalcColumnLogLikelihood(Node* root, MirageParameters& parameters){
   for(int i = 0; i < _number_of_mixtures; i++){
+    int temp_i = _mixture_method_id == 0 ? i : 0;
+    
     for(int j = 0; j < _number_of_samples; j++){
       double temp = -DBL_MAX;
       for(int k = 0; k < _dim ; k++){
-	if(parameters.GetInitProb(i,k) != 0.0){	 
-	  double value = root->inside_values[GetTripleArrayId(j,i,k)] + log(parameters.GetInitProb(i,k));
+	if(parameters.GetInitProb(temp_i,k) != 0.0){	 
+	  double value = root->inside_values[GetTripleArrayId(j,i,k)] + log(parameters.GetInitProb(temp_i,k));
 	  temp = temp == -DBL_MAX ? value : logsumexp(temp, value);
 	}
       }
+      
       _column_log_likelihood[j][i] = temp;
       for(int k = 0; k < _dim ; k++){
 	_init_prob_sufficient_statistics[j][i][k] =
-	  parameters.GetInitProb(i,k) == 0.0 ? 0.0 : fmath::expd(root->inside_values[GetTripleArrayId(j,i,k)] + log(parameters.GetInitProb(i,k)) - temp);
+	  parameters.GetInitProb(temp_i,k) == 0.0 ? 0.0 : fmath::expd(root->inside_values[GetTripleArrayId(j,i,k)] + log(parameters.GetInitProb(temp_i,k)) - temp);
+
       }
+      
     }
   }
 }
 
 double Mirage::logsumexp(double x, double y){
-  double temp = x > y ? x + log(fmath::expd(y-x) + 1.0) : y + log(fmath::expd(x-y) + 1.0) ;
+  double temp = x > y ? x + log1p(fmath::expd(y-x)) : y + log1p(fmath::expd(x-y)) ;
   return(temp);
 }
 
