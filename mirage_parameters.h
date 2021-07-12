@@ -20,6 +20,7 @@ using namespace std;
 class MirageParameters{
  public:
   MirageParameters(){
+    _mode = 0;
     _output_file_name = "";
     _init_grad_weight = 0.1;
     _weight_decay_rate = 0.1;
@@ -38,6 +39,7 @@ class MirageParameters{
     _gamma_distribution_parameter = 1.0;
     _gamma_dist_sample_size = 10000;
     _loop_max = 200;
+    _scaling_factor = 1.0;
   }
   void SetTrainingParameters(int argc, char* argv[]);
   void SetEstimationParameters(int argc, char* argv[]);
@@ -67,6 +69,7 @@ class MirageParameters{
   double GetLoopThreshold(void);
   double GetGammaDistributionParameter(void);
   double GetGammaRate(int i, int j);
+  double GetScalingFactor();
   Node* GetRoot(void);
   vector<MatrixXd> GetSubstitutionRateMatrix(void);
   void SetAlpha(int i, double alpha);
@@ -80,6 +83,7 @@ class MirageParameters{
   
  private:
   string _output_file_name;
+  int _mode;
   int _max_number;
   int _dim;
   int _model_id;
@@ -97,6 +101,7 @@ class MirageParameters{
   double _loop_threshold;
   double _gamma_distribution_parameter;
   double _max_rate;
+  double _scaling_factor;
   Node* _root;
   vector<double> _mixture_probability;
   vector<double> _rate_parameter;
@@ -112,9 +117,10 @@ class MirageParameters{
   void ReadParameter(string file_name);
   void ParameterInitialization();
  
-  void ParseTree(string& newick, vector<Node*>& leaf_list);
+  void ParseTree(double& max_length, string& newick, vector<Node*>& leaf_list);
   int GetTripleArrayId(int sample_id, int mixture_id, int element_id);
   string ParseName(string& newick, int& i);
   Node* MakeNode(void);
+  void ScalingEdgeLength(Node* current);
 };
 #endif

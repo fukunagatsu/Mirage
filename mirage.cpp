@@ -3,7 +3,6 @@
 
 void Mirage::Train(MirageParameters& parameters){
   Initiallize(parameters);
-  
   double old_log_likelihood = 0.0;
   double new_log_likelihood = 0.0;
   int count = 0;
@@ -185,6 +184,7 @@ void Mirage::Output(MirageParameters& parameters, int id){
     }
 
     int number_of_raw_matricies = _mixture_method_id == 0 ? _number_of_mixtures : 1;
+    double scaling_factor = parameters.GetScalingFactor();
     
     for(int i = 0; i < number_of_raw_matricies; i++){
       for(int j = 0; j < _dim; j++){
@@ -193,12 +193,12 @@ void Mirage::Output(MirageParameters& parameters, int id){
       ofs_par << endl;
       
       if(_model_id == 1){
-	ofs_par << parameters.GetAlpha(i) << " " << parameters.GetBeta(i) << endl;
+	ofs_par << parameters.GetAlpha(i)*scaling_factor << " " << parameters.GetBeta(i)*scaling_factor << endl;
       }else if(_model_id == 2 || _model_id == 3){
-	ofs_par << parameters.GetAlpha(i) << " " << parameters.GetBeta(i) << " " << parameters.GetGamma(i) << endl;
+	ofs_par << parameters.GetAlpha(i)*scaling_factor << " " << parameters.GetBeta(i)*scaling_factor << " " << parameters.GetGamma(i)*scaling_factor << endl;
       }else{
 	for(int j = 0; j < (_dim - 1)*2 ; j++){
-	  ofs_par << parameters.GetParameter(i,j) << " ";
+	  ofs_par << parameters.GetParameter(i,j)*scaling_factor << " ";
 	}
 	ofs_par << endl;
       }

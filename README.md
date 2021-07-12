@@ -36,7 +36,9 @@ Mirage has two modes, a training mode and an estimation mode. In the training mo
                 
 ## Input File Format
 The input file must be in the following format.  
-In the first, second and third lines, the number of ortholog, the phylogenetic tree in the newick format and the taxon name in the phylogenetic tree is described, respectively. In the following lines, the ortsholog table is described.
+In the first, second and third lines, the number of ortholog, the phylogenetic tree in the newick format and the taxon name in the phylogenetic tree is described, respectively.
+Currently, Mirage can read only format 5 (internal and leaf branches + leaf names) in the ETE toolkit as the newick format. If your tree has internal node names or support values, please remove these descriptions before applying Mirage.
+In the following lines, the ortsholog table is described.
 We have uploaded three files, archaea_data.txt, micrococcales_data.txt, and fungi_data.txt, as the input file examples, please see them.
 
 ## Output File Format

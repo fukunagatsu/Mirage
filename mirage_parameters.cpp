@@ -6,6 +6,7 @@ void MirageParameters::SetTrainingParameters(int argc,char* argv[]){
   int c;
   extern char *optarg;
   string input_file_name;
+  _mode = 0;
   
   while ((c = getopt(argc, argv, "i:o:l:m:n:k:")) != -1) {
     switch (c) {
@@ -65,6 +66,7 @@ void MirageParameters::SetEstimationParameters(int argc,char* argv[]){
   extern char *optarg;
   string input_file_name;
   string input_parameter_file_name;
+  _mode = 1;
   
   while ((c = getopt(argc, argv, "i:p:o:")) != -1) {
     switch (c) {
@@ -185,6 +187,10 @@ double MirageParameters::GetWeightDecayRate(void){
 
 double MirageParameters::GetWeightThreshold(void){
   return _weight_threshold;
+}
+
+double MirageParameters::GetScalingFactor(void){
+  return _scaling_factor;
 }
 
 vector<MatrixXd> MirageParameters::GetSubstitutionRateMatrix(void){
@@ -391,6 +397,23 @@ void MirageParameters::SetSubstitutionRateMatrix(){
   }
 }
 
+void MirageParameters::ScalingEdgeLength(Node* current){
+  if(current->parent != NULL){
+    current->edge_length *= _scaling_factor;
+  }
+  
+  if(current->left == NULL && current->right == NULL){
+    return;
+  }
+  if(current->left != NULL){
+    ScalingEdgeLength(current->left);
+  }
+  if(current->right != NULL){
+    ScalingEdgeLength(current->right);
+  }
+  return;  
+}
+
 void MirageParameters::ReadData(string file_name){
   ifstream fp;
   fp.open(file_name.c_str(), ios::in);
@@ -404,7 +427,15 @@ void MirageParameters::ReadData(string file_name){
 
   _root = MakeNode();
   vector<Node*> leaf_list;
-  ParseTree(newick, leaf_list);
+  double max_length = 0;
+  ParseTree(max_length, newick, leaf_list);
+  if(_mode == 0){
+    if(max_length > 3.0 || max_length < 0.05){
+      _scaling_factor = 1.0/max_length;
+      ScalingEdgeLength(_root);
+    }
+  }
+  
   int number_of_species = leaf_list.size();
   vector<string> name_list; name_list.resize(number_of_species, "");
   vector<int> corresponding_table; corresponding_table.resize(number_of_species, 0);
@@ -486,7 +517,7 @@ string MirageParameters::ParseName(string& newick, int& i){
   return temp_name;
 }
 
-void MirageParameters::ParseTree(string& newick, vector<Node*>& leaf_list){  
+void MirageParameters::ParseTree(double& max_length, string& newick, vector<Node*>& leaf_list){  
   Node* current = _root;
   for(int i = 0; i < newick.size()-1;i++){
     if(newick[i] == '('){
@@ -503,6 +534,7 @@ void MirageParameters::ParseTree(string& newick, vector<Node*>& leaf_list){
     }else if(newick[i] == ':'){
       i++;
       current->edge_length = stof(ParseName(newick,i));
+      if(max_length < current->edge_length){max_length = current->edge_length;}
     }else{
       string temp_name = ParseName(newick,i);
       current->name = (char*)malloc(sizeof(char)*(temp_name.size()+1));
