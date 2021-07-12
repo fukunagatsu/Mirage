@@ -27,8 +27,8 @@ Mirage has two modes, a training mode and an estimation mode. In the training mo
         -m INT    Specification of the gain/loss model. 0: the BDARD model 1: the BD model 2: the C&M model 3: the BDI model [default: 0]
         -k INT    The number of mixture components in the phylogenetic mixture model [default: 5]
         -n INT    Specification of the heterogeneity model. 0: the PM model 1: the PDF model 2: the Gamma model [default: 0]
-	-t DBL    A threshold for termination of the EM algorithm. [default: 1.0]
-	-p INT    Maximum number of loops in the EM algorithm [default: 200]
+        -t DBL    A threshold for termination of the EM algorithm. [default: 1.0]
+        -p INT    Maximum number of loops in the EM algorithm [default: 200]
         
     estimate: only estimate ancestral genome
     
