@@ -40,7 +40,15 @@ void MirageParameters::SetTrainingParameters(int argc,char* argv[]){
       
     case 'k':
       _number_of_mixtures = atoi(optarg);
-      break;      
+      break;
+
+    case 't':
+      _loop_threshold = atof(optarg);
+      break;
+
+    case 'p':
+      _loop_max = atoi(optarg);
+      break;
 
     default:
       cerr << "The argument is an invalid command." << endl;

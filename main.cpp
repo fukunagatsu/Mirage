@@ -3,7 +3,7 @@
 #include <string>
 
 void PrintUsage() {
-  cout << "Mirage version 1.1 - Ancestral Genome Estimation based on a phylogenetic mixture model and a RER model." << endl;
+  cout << "Mirage version 1.1.1 - Estimation of ancestral gene-copy numbers by considering different evolutionary patterns among gene families." << endl;
   cout << "\n";
   cout << "Options\n";
   cout << "train: training of evolutionary model parameters from a phylogenetic tree and an ortholog table\n";

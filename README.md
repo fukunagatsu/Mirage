@@ -2,7 +2,7 @@
 Mirage is ancestral genome estimation software with high accuracy based on a phylogenetic mixture model and a RER model.
 
 ## Version
-Version 1.1.0 (2021/02/09)
+Version 1.1.1 (2021/07/12)
 
 ## Usage
 Mirage has two modes, a training mode and an estimation mode. In the training mode, Mirage trains the evolutionary model parameters and estimates ancestral genome from an input ortholog table and a phylogenetic tree using Mirage "train" command. Mirage "train" command requires 2 options ([-i InputFileName] and [-o OutputFileName]). In the estimation mode, Mirage only estimates ancestral genome from an input ortholog table, a phylogenetic tree and evolutionary model parameters using Mirage "estimate" command. Mirage "estimate" command requires 3 options ([-i InputFileName], [-o OutputFileName] and [-p ParameterFileName]).
@@ -27,10 +27,12 @@ Mirage has two modes, a training mode and an estimation mode. In the training mo
         -m INT    Specification of the gain/loss model. 0: the BDARD model 1: the BD model 2: the C&M model 3: the BDI model [default: 0]
         -k INT    The number of mixture components in the phylogenetic mixture model [default: 5]
         -n INT    Specification of the heterogeneity model. 0: the PM model 1: the PDF model 2: the Gamma model [default: 0]
+	-t DBL    A threshold for termination of the EM algorithm. [default: 1.0]  
+	-p INT    Maximum number of loops in the EM algorithm [default: 200]  
         
     estimate: only estimate ancestral genome
     
-    Mirage train [-i InputFileName] [-o OutputFileName] [-p ParameterFileName]
+    Mirage estimate [-i InputFileName] [-o OutputFileName] [-p ParameterFileName]
                 
 ## Input File Format
 The input file must be in the following format.  
@@ -53,4 +55,4 @@ This software is released under the MIT License, see LICENSE.txt.
 Eigen is primarily licensed under MPL2, and please see [the original license description](Eigen/COPYING.README).
 
 ## Reference
-Tsukasa Fukunaga and Wataru Iwasaki. "Mirage; A phylogenetic mixture model to reconstruct gene content evolutionary history using a realistic parameter model of gene gain and loss events." under submission.
+Tsukasa Fukunaga and Wataru Iwasaki. "Mirage; Estimation of ancestral gene-copy numbers by considering different evolutionary patterns among gene families." under submission.
