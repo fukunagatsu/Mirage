@@ -57,4 +57,4 @@ This software is released under the MIT License, see LICENSE.txt.
 Eigen is primarily licensed under MPL2, and please see [the original license description](Eigen/COPYING.README).
 
 ## Reference
-Tsukasa Fukunaga and Wataru Iwasaki. "Mirage; Estimation of ancestral gene-copy numbers by considering different evolutionary patterns among gene families." under submission.
+Tsukasa Fukunaga and Wataru Iwasaki. "Mirage; Estimation of ancestral gene-copy numbers by considering different evolutionary patterns among gene families." Bioinformatics Advances, vbab014.
