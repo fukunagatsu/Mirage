@@ -36,14 +36,14 @@ Mirage has two modes, a training mode and an estimation mode. In the training mo
     
     Mirage train [-i InputFileName] [-o OutputFileName] [-p ParameterFileName] [-r OutputStyle]
 
-Options:
+    Options:
     (Required)
         -i STR    InputFileName
         -o STR    OutputFileName
-	-p STR    ParameterFileName
+        -p STR    ParameterFileName
         
     (Optional) 
-	-r INT    The output style of gene content reconstruction. [defualt: 0]
+        -r INT    The output style of gene content reconstruction. [defualt: 0]
                 
 ## Input File Format
 The input file must be in the following format.  
