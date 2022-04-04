@@ -9,14 +9,15 @@ using namespace Eigen;
 
 typedef struct lnode {
   char* name;
+  int node_id;
+  int* inside_cash_index;
+  int* outside_cash_index;
   double edge_length;
   double* inside_values;
   double* outside_values;
-  double* fd_values;
-  double* ns_values;
   double* logL;
-  int* c;
-  int* reconstruction;
+  char* c;
+  char* reconstruction;
   struct lnode *parent;
   struct lnode *right;
   struct lnode *left;

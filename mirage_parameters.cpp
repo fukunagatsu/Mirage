@@ -1,14 +1,14 @@
 #include "mirage_parameters.h"
 #include <getopt.h>
 #include <stdlib.h>
+#include <unordered_map>
 
 void MirageParameters::SetTrainingParameters(int argc,char* argv[]){
   int c;
   extern char *optarg;
   string input_file_name;
-  _mode = 0;
   
-  while ((c = getopt(argc, argv, "i:o:l:m:n:k:")) != -1) {
+  while ((c = getopt(argc, argv, "i:o:l:m:n:k:s:r:")) != -1) {
     switch (c) {
     case 'i':
       input_file_name = optarg;
@@ -33,7 +33,7 @@ void MirageParameters::SetTrainingParameters(int argc,char* argv[]){
 
     case 'n':
       _mixture_method_id = atoi(optarg);
-      if(_mixture_method_id < 0 || _mixture_method_id > 2){
+      if(_mixture_method_id < 0 || _mixture_method_id > 3){
 	cout << "Error: Invalid model id" << endl;
 	exit(1);
       }
@@ -43,12 +43,16 @@ void MirageParameters::SetTrainingParameters(int argc,char* argv[]){
       _number_of_mixtures = atoi(optarg);
       break;
 
-    case 't':
-      _loop_threshold = atof(optarg);
+    case 's':
+      _seed = atoi(optarg);
       break;
 
-    case 'p':
-      _loop_max = atoi(optarg);
+    case 'r':
+      _output_style = atoi(optarg);
+      if(_output_style < 0 || _output_style > 2){
+	cout << "Error: Invalid Output Style" << endl;
+	exit(1);
+      }
       break;
 
     default:
@@ -66,9 +70,8 @@ void MirageParameters::SetEstimationParameters(int argc,char* argv[]){
   extern char *optarg;
   string input_file_name;
   string input_parameter_file_name;
-  _mode = 1;
   
-  while ((c = getopt(argc, argv, "i:p:o:")) != -1) {
+  while ((c = getopt(argc, argv, "i:p:o:r:")) != -1) {
     switch (c) {
     case 'i':
       input_file_name = optarg;
@@ -80,6 +83,14 @@ void MirageParameters::SetEstimationParameters(int argc,char* argv[]){
 
     case 'o':
       _output_file_name = optarg;
+      break;
+
+    case 'r':
+      _output_style = atoi(optarg);
+      if(_output_style < 0 || _output_style > 2){
+	cout << "Error: Invalid Output Style" << endl;
+	exit(1);
+      }
       break;
 
     default:
@@ -156,6 +167,14 @@ int MirageParameters::GetNumberOfSamples(void){
   return _number_of_samples;
 }
 
+int MirageParameters::GetSeed(void){
+  return _seed;
+}
+
+int MirageParameters::GetOutputStyle(void){
+  return _output_style;
+}
+
 double MirageParameters::GetInitProb(int i, int j){
   return _init_prob[i](j);
 }
@@ -187,10 +206,6 @@ double MirageParameters::GetWeightDecayRate(void){
 
 double MirageParameters::GetWeightThreshold(void){
   return _weight_threshold;
-}
-
-double MirageParameters::GetScalingFactor(void){
-  return _scaling_factor;
 }
 
 vector<MatrixXd> MirageParameters::GetSubstitutionRateMatrix(void){
@@ -233,9 +248,12 @@ void MirageParameters::CalcAllGammaRate(){
   }
 }
 
+bool MirageParameters::IsPartitionMixture(){
+  return(_mixture_method_id == 0 || _mixture_method_id == 3);
+}
+
 vector<double> MirageParameters::CalcGammaRate(double g){
-  random_device rnd;
-  mt19937 mt(rnd());
+  mt19937 mt(0);
   vector<double> rate_parameter; rate_parameter.resize(_number_of_mixtures);
   
   gamma_distribution<> gamma_dist(g, 1.0/g);
@@ -269,7 +287,7 @@ void MirageParameters::ReadParameter(string file_name){
   fp >> _mixture_method_id;
   fp >> _number_of_mixtures;
   
-  int number_of_raw_matricies = _mixture_method_id == 0 ? _number_of_mixtures : 1;  
+  int number_of_raw_matricies = IsPartitionMixture() ? _number_of_mixtures : 1;  
   _mixture_probability.resize(_number_of_mixtures, 0.0);
   _init_prob.resize(number_of_raw_matricies, VectorXd::Zero(_dim));
 
@@ -285,7 +303,7 @@ void MirageParameters::ReadParameter(string file_name){
     _gamma.resize(number_of_raw_matricies, 0.0);      
   }
 
-  if(_mixture_method_id <= 1){    
+  if(_mixture_method_id != 2){    
     for(int i = 0; i < _number_of_mixtures; i++){
       fp >> _mixture_probability[i];
     }
@@ -332,7 +350,7 @@ void MirageParameters::SetSubstitutionRateMatrix(){
   for(int i = 0; i < _number_of_mixtures; i++){
     _substitution_rate_matrix[i] = MatrixXd::Zero(_dim,_dim);
     if(_model_id == 1){
-      if(_mixture_method_id == 0){
+      if(IsPartitionMixture()){
 	for(int j = 0; j < _dim-1; j++){	
 	  _substitution_rate_matrix[i](j, j+1) = _alpha[i];
 	  _substitution_rate_matrix[i](j+1, j) = _beta[i];
@@ -344,7 +362,7 @@ void MirageParameters::SetSubstitutionRateMatrix(){
 	}
       }
     }else if(_model_id == 2){
-      if(_mixture_method_id == 0){
+      if(IsPartitionMixture()){
 	for(int j = 0; j < _dim-1; j++){	
 	  _substitution_rate_matrix[i](j, j+1) += _alpha[i]+j*_gamma[i];
 	  _substitution_rate_matrix[i](j+1, j) += (j+1)*_beta[i];
@@ -356,7 +374,7 @@ void MirageParameters::SetSubstitutionRateMatrix(){
 	}
       }
     }else if(_model_id == 0){
-      if(_mixture_method_id == 0){
+      if(IsPartitionMixture()){
 	for(int j = 0; j < _dim-1; j++){	  
 	  _substitution_rate_matrix[i](j, j+1) += _parameter[i][j];
 	  _substitution_rate_matrix[i](j+1, j) += _parameter[i][_dim-1+j];
@@ -368,7 +386,7 @@ void MirageParameters::SetSubstitutionRateMatrix(){
 	}
       }
     }else{
-      if(_mixture_method_id == 0){
+      if(IsPartitionMixture()){
 	_substitution_rate_matrix[i](0, 1) = _gamma[i];
 	_substitution_rate_matrix[i](1, 0) = _beta[i];
 	for(int j = 1; j < _dim-1; j++){
@@ -397,23 +415,6 @@ void MirageParameters::SetSubstitutionRateMatrix(){
   }
 }
 
-void MirageParameters::ScalingEdgeLength(Node* current){
-  if(current->parent != NULL){
-    current->edge_length *= _scaling_factor;
-  }
-  
-  if(current->left == NULL && current->right == NULL){
-    return;
-  }
-  if(current->left != NULL){
-    ScalingEdgeLength(current->left);
-  }
-  if(current->right != NULL){
-    ScalingEdgeLength(current->right);
-  }
-  return;  
-}
-
 void MirageParameters::ReadData(string file_name){
   ifstream fp;
   fp.open(file_name.c_str(), ios::in);
@@ -427,15 +428,7 @@ void MirageParameters::ReadData(string file_name){
 
   _root = MakeNode();
   vector<Node*> leaf_list;
-  double max_length = 0;
-  ParseTree(max_length, newick, leaf_list);
-  if(_mode == 0){
-    if(max_length > 3.0 || max_length < 0.05){
-      _scaling_factor = 1.0/max_length;
-      ScalingEdgeLength(_root);
-    }
-  }
-  
+  ParseTree(newick, leaf_list);
   int number_of_species = leaf_list.size();
   vector<string> name_list; name_list.resize(number_of_species, "");
   vector<int> corresponding_table; corresponding_table.resize(number_of_species, 0);
@@ -452,7 +445,6 @@ void MirageParameters::ReadData(string file_name){
       }
     }
   }
-  
   for(int i = 0; i < _number_of_samples; i++){
     fp >> s_temp;
     for(int j = 0; j < number_of_species; j++){
@@ -462,13 +454,191 @@ void MirageParameters::ReadData(string file_name){
 	temp = _max_number;
       }
       leaf_list[corresponding_table[j]]->reconstruction[i] = temp;
-      for(int k = 0; k < _number_of_mixtures; k++){
-	leaf_list[corresponding_table[j]]->inside_values[GetTripleArrayId(i,k,temp)] = 0.0;
-      }
     }
   }
   fp.close();
+
+  vector<vector<string> > inside_string_vector(_node_id_count);
+  CalcInsideCash(_root,inside_string_vector);
+  
+  if(_mixture_method_id != 3){
+    vector<vector<string> > outside_string_vector(_node_id_count);
+    CalcOutsideCash(_root,inside_string_vector, outside_string_vector, -1);
+  }
 }
+
+string MirageParameters::GetStringFromStringVector(vector<string> &input, int i){
+  string temp = input[i];
+  if(temp[0] == '#'){
+    temp = input[stoi(temp.substr(1))];
+  }
+  return(temp);
+}
+
+void MirageParameters::ConstructInsideStringVector(Node* current, vector<vector<string> > &inside_string_vector, int index){
+  unordered_map<string, pair<int, int> > inside_cash_map;
+  int uniq_count = 0;
+  vector<int> temp_vector;
+  for(int i = 0; i < _number_of_samples; i++){
+    string concat_string = "";
+    if(index == 0){
+      concat_string = to_string(current->reconstruction[i]);
+    }else{
+      string l_string = GetStringFromStringVector(inside_string_vector[current->left->node_id], i);
+      string r_string = GetStringFromStringVector(inside_string_vector[current->right->node_id], i);      
+      concat_string = l_string+r_string;      
+    }
+    
+    auto itr = inside_cash_map.find(concat_string);    
+    if( itr == inside_cash_map.end() ) {
+      uniq_count += 1;
+      inside_cash_map.insert(make_pair(concat_string, make_pair(i, 1)));
+      current->inside_cash_index[i] = -uniq_count;
+      if(index == 0){
+	temp_vector.push_back(current->reconstruction[i]);
+      }
+    } else {
+      current->inside_cash_index[i] = itr->second.first;
+      itr->second.second += 1;
+    }
+  }
+	  
+  current->inside_values = (double*)malloc(sizeof(double)*_dim*_number_of_mixtures*uniq_count);
+  for(int i = 0; i < _dim*_number_of_mixtures*uniq_count; i++){
+    current->inside_values[i] = -DBL_MAX;
+  }
+  if(index == 0){
+    for(int i = 0; i < uniq_count; i++){
+      for(int k = 0; k < _number_of_mixtures; k++){
+	current->inside_values[GetTripleArrayId(i,k,temp_vector[i])] = 0.0;
+      }
+    }
+  }
+  inside_string_vector[current->node_id].resize(_number_of_samples, "");
+  for(int i = 0; i < _number_of_samples; i++){
+    string concat_string = "";
+    if(index == 0){
+      concat_string = to_string(current->reconstruction[i]);
+    }else{
+      string l_string = GetStringFromStringVector(inside_string_vector[current->left->node_id], i);
+      string r_string = GetStringFromStringVector(inside_string_vector[current->right->node_id], i);      
+      concat_string = l_string+r_string;
+    }    
+    auto itr = inside_cash_map.find(concat_string);
+    if( itr->second.second == 1) {
+      inside_string_vector[current->node_id][i] = '$'+to_string(i);      
+    }else if(itr->second.second > 1){
+      inside_string_vector[current->node_id][i] = concat_string;
+      itr->second.second = -i;
+    }else{
+      inside_string_vector[current->node_id][i] = '#'+to_string(-(itr->second.second)); 
+    }
+  }
+  
+  if(index != 0 && _mixture_method_id == 3){
+    inside_string_vector[current->left->node_id].clear();
+    inside_string_vector[current->left->node_id].shrink_to_fit();
+    inside_string_vector[current->right->node_id].clear();
+    inside_string_vector[current->right->node_id].shrink_to_fit();
+  }
+}
+
+void MirageParameters::CalcInsideCash(Node* current, vector<vector<string> > &inside_string_vector){
+ 
+  if(current->left == NULL && current->right == NULL){
+    ConstructInsideStringVector(current,inside_string_vector, 0);
+    return;
+  }
+  
+  if(current->left != NULL){
+    CalcInsideCash(current->left,inside_string_vector);
+  }
+  if(current->right != NULL){
+    CalcInsideCash(current->right,inside_string_vector);
+  }
+  
+  ConstructInsideStringVector(current,inside_string_vector, 1);
+  return;  
+}
+
+void MirageParameters::CalcOutsideCash(Node* current, vector<vector<string> > &inside_string_vector, vector<vector<string> > &outside_string_vector, int id){
+  if(current->parent != NULL){
+    unordered_map<string, pair<int, int> > outside_cash_map;
+    int uniq_count = 0;
+    Node* sister = id == 0 ? current->parent->right : current->parent->left;
+    
+    for(int i = 0; i < _number_of_samples; i++){
+      string sis_string = GetStringFromStringVector(inside_string_vector[sister->node_id], i);
+      string par_string = "";
+      if(current->parent->parent != NULL){
+	par_string = GetStringFromStringVector(outside_string_vector[current->parent->node_id], i);
+      }
+      string concat_string = par_string+sis_string;
+      
+      auto itr = outside_cash_map.find(concat_string);
+      if(itr == outside_cash_map.end()) {
+	uniq_count += 1;
+	outside_cash_map.insert(make_pair(concat_string, make_pair(i, 1)));
+	current->outside_cash_index[i] = -uniq_count;
+      } else {
+	current->outside_cash_index[i] = itr->second.first;
+	itr->second.second += 1;
+      }
+    }
+    current->outside_values = (double*)malloc(sizeof(double)*_dim*_number_of_mixtures*uniq_count); 
+    for(int i = 0; i < _dim*_number_of_mixtures*uniq_count; i++){
+      current->outside_values[i] = -DBL_MAX;
+    }
+
+    outside_string_vector[current->node_id].resize(_number_of_samples, "");
+    for(int i = 0; i < _number_of_samples; i++){
+      string sis_string = GetStringFromStringVector(inside_string_vector[sister->node_id], i);
+      string par_string = "";
+      if(current->parent->parent != NULL){
+	par_string = GetStringFromStringVector(outside_string_vector[current->parent->node_id], i);
+      }
+      string concat_string= par_string+sis_string;
+      
+      auto itr = outside_cash_map.find(concat_string);
+      if( itr->second.second == 1) {
+	outside_string_vector[current->node_id][i] = '$'+to_string(i);      
+      }else if(itr->second.second > 1){
+	outside_string_vector[current->node_id][i] = concat_string;
+	itr->second.second = -i;
+      }else{
+	outside_string_vector[current->node_id][i] = '#'+to_string(-(itr->second.second)); 
+      }
+    }
+    
+    inside_string_vector[sister->node_id].clear();
+    inside_string_vector[sister->node_id].shrink_to_fit();
+  }else{
+    int uniq_count = 1;    
+    for(int i = 0; i < _number_of_samples; i++){
+      current->outside_cash_index[i] = i==0 ? -uniq_count : 0;
+    }
+    current->outside_values = (double*)malloc(sizeof(double)*_dim*_number_of_mixtures*uniq_count); 
+    for(int i = 0; i < _dim*_number_of_mixtures*uniq_count; i++){
+      current->outside_values[i] = -DBL_MAX;
+    }
+  }
+  
+  if(current->left == NULL && current->right == NULL){
+    return;
+  }
+
+  if(current->left != NULL){
+    CalcOutsideCash(current->left,inside_string_vector, outside_string_vector, 0);
+  }
+  if(current->right != NULL){
+    CalcOutsideCash(current->right,inside_string_vector, outside_string_vector, 1);
+  }
+  outside_string_vector[current->node_id].clear();
+  outside_string_vector[current->node_id].shrink_to_fit();
+  return;  
+}
+
+
 
 int MirageParameters::GetTripleArrayId(int sample_id, int mixture_id, int element_id){
   return(sample_id*_number_of_mixtures*_dim + mixture_id*_dim + element_id);
@@ -476,29 +646,17 @@ int MirageParameters::GetTripleArrayId(int sample_id, int mixture_id, int elemen
 
 Node* MirageParameters::MakeNode(void){
   Node* temp = (Node*)malloc(sizeof(Node));
+  temp->node_id = _node_id_count; _node_id_count++;
+  temp->inside_cash_index = (int*)malloc(sizeof(int)*_number_of_samples);    
   temp->edge_length = 0;
-  temp->inside_values = (double*)malloc(sizeof(double)*_dim*_number_of_mixtures*_number_of_samples);
-  temp->outside_values = (double*)malloc(sizeof(double)*_dim*_number_of_mixtures*_number_of_samples);
-  temp->fd_values = (double*)malloc(sizeof(double)*_dim*_number_of_mixtures*_number_of_samples);
-  temp->ns_values = (double*)malloc(sizeof(double)*_dim*(_dim-1)*_number_of_mixtures*_number_of_samples);
-  temp->logL = (double*)malloc(sizeof(double)*_dim*_number_of_mixtures*_number_of_samples);
-  temp->c = (int*)malloc(sizeof(int)*_dim*_number_of_mixtures*_number_of_samples);
-  temp->reconstruction = (int*)malloc(sizeof(int)*_number_of_samples);
-
   
-  for(int i = 0; i < _dim*_number_of_samples*_number_of_mixtures; i++){
-    temp->inside_values[i] = -DBL_MAX;
-    temp->outside_values[i] = -DBL_MAX;
-    temp->fd_values[i] = 0;
-    temp->logL[i] = -DBL_MAX;
-    temp->c[i] = -1;
-  }
-  for(int i = 0; i < _dim*(_dim-1)*_number_of_samples*_number_of_mixtures; i++){
-    temp->ns_values[i] = 0;
-  }
-
-  for(int i = 0; i < _number_of_samples; i++){
-    temp->reconstruction[i] = -1;
+  if(_mixture_method_id == 3){
+    temp->outside_values = (double*)malloc(sizeof(double)*_dim*_number_of_samples);
+    for(int i = 0; i < _dim*_number_of_samples; i++){
+      temp->outside_values[i] = -DBL_MAX;
+    }
+  }else{
+    temp->outside_cash_index = (int*)malloc(sizeof(int)*_number_of_samples);
   }
   
   temp->parent = NULL;
@@ -517,7 +675,7 @@ string MirageParameters::ParseName(string& newick, int& i){
   return temp_name;
 }
 
-void MirageParameters::ParseTree(double& max_length, string& newick, vector<Node*>& leaf_list){  
+void MirageParameters::ParseTree(string& newick, vector<Node*>& leaf_list){  
   Node* current = _root;
   for(int i = 0; i < newick.size()-1;i++){
     if(newick[i] == '('){
@@ -534,11 +692,14 @@ void MirageParameters::ParseTree(double& max_length, string& newick, vector<Node
     }else if(newick[i] == ':'){
       i++;
       current->edge_length = stof(ParseName(newick,i));
-      if(max_length < current->edge_length){max_length = current->edge_length;}
     }else{
       string temp_name = ParseName(newick,i);
       current->name = (char*)malloc(sizeof(char)*(temp_name.size()+1));
       strcpy(current->name, temp_name.c_str());
+      current->reconstruction = (char*)malloc(sizeof(char)*_number_of_samples);
+      for(int i = 0; i < _number_of_samples; i++){
+	current->reconstruction[i] = -1;
+      }
       leaf_list.push_back(current);
     }
   }
@@ -547,15 +708,17 @@ void MirageParameters::ParseTree(double& max_length, string& newick, vector<Node
 void MirageParameters::ParameterInitialization(){
   
   _mixture_probability.resize(_number_of_mixtures, 0.0);  
-  int number_of_raw_matricies = _mixture_method_id == 0 ? _number_of_mixtures : 1;
+  int number_of_raw_matricies = IsPartitionMixture() ? _number_of_mixtures : 1;
   _init_prob.resize(number_of_raw_matricies, VectorXd::Zero(_dim));
 
   _substitution_rate_matrix.resize(_number_of_mixtures, MatrixXd::Zero(_dim,_dim));
-  random_device rnd;
-  int temp = rnd();
-  mt19937 mt(temp);
+  while(_seed < 0){
+    random_device rnd;
+    _seed = rnd();
+  }
+  mt19937 mt(_seed);
 
-  if(_mixture_method_id <= 1){
+  if(_mixture_method_id != 2){
     int sum = 0;
     for(int i = 0; i < _number_of_mixtures; i++){
       _mixture_probability[i] = mt()%1000+1;    
@@ -582,7 +745,7 @@ void MirageParameters::ParameterInitialization(){
     }
   }
   
-  if(_mixture_method_id >= 1){
+  if(!IsPartitionMixture()){
     _max_init = 1.5;
   }
   uniform_real_distribution<double> uniform_distribution(_min_init, _max_init);
