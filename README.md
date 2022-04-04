@@ -1,3 +1,4 @@
+
 # Mirage
 Mirage is ancestral genome estimation software with high accuracy based on a phylogenetic mixture model.
 
@@ -15,8 +16,8 @@ Mirage has two modes, a training mode and an estimation mode. In the training mo
     train: train evolutionary model parameters and estimate ancestral genome
 
     Mirage train [-i InputFileName] [-o OutputFileName] [-l MaximumGeneCopyNumbers]  
-                [-m Gain/LossModelId] [-k NumberOfMixtures] [-n HeterogeneityModelId]
-		[-s RandomSeed] [-r OutputStyle]
+                [-m Gain/LossModelId] [-k NumberOfMixtures] [-n HeterogeneityModelId]  
+                [-s RandomSeed] [-r OutputStyle]  
    
     Options:
     (Required)
@@ -27,9 +28,9 @@ Mirage has two modes, a training mode and an estimation mode. In the training mo
         -l INT    The maximum gene copy numbers [default:3]
         -m INT    Specification of the gain/loss model. 0: the BDARD model 1: the BD model 2: the C&M model 3: the BDI model [default: 0]
         -k INT    The number of mixture components in the phylogenetic mixture model [default: 5]
-	-n INT    Specification of the heterogeneity model. 0: the PPM model 1: the PDF model 2: the Gamma model 3: the DPM model [default: 3]
-	-s INT    A seed value for randomization. When the value is set to negative, the seed value is randomly generated. [defualt: -1]
-	-r INT    The output style of gene content reconstruction. When the value is 0, the numbers of genes in the ancestral nodes are output. When the value is 1, the numbers of increase or decrease of genes in the branches are output. [defualt: 0]
+        -n INT    Specification of the heterogeneity model. 0: the PPM model 1: the PDF model 2: the Gamma model 3: the DPM model [default: 3]
+        -s INT    A seed value for randomization. When the value is set to negative, the seed value is randomly generated. [defualt: -1]
+        -r INT    The output style of gene content reconstruction. When the value is 0, the numbers of genes in the ancestral nodes are output. When the value is 1, the numbers of increase or decrease of genes in the branches are output. [defualt: 0]
 
     estimate: only estimate ancestral genome
     
